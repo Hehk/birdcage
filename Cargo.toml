@@ -1,0 +1,17 @@
+[package]
+name = "birdcage"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+build = "platform/build.rs"
+
+[[bin]]
+name = "birdcage"
+path = "platform/host.rs"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

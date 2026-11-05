@@ -1,0 +1,3 @@
+[target.x86_64-unknown-linux-gnu]
+# Roc's archive currently requires a non-PIE executable.
+rustflags = ["-C", "relocation-model=static"]

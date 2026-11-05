@@ -1,0 +1,21 @@
+# Build output and downloaded tools
+/build/
+/target/
+/.tools/
+/.roc_cache/
+
+# Nix and direnv
+/.direnv/
+/result
+/result-*
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+*.swp
+*.swo
+*~
+.DS_Store
