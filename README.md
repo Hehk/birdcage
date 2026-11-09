@@ -14,8 +14,10 @@ just lint
 `review` currently runs a multi-round scripted investigation with fixture
 `read_file`, `list_files`, `search`, and `git_diff` tools. It does not inspect a
 repository or contact a model provider. Use `--script search-first` to choose a
-different investigation (`diff-first` is the default; `single-read` and `final`
-are smaller fixtures). Requests/results are printed for inspection. `file-demo <path>` is a development-only async I/O fixture;
+different investigation (`diff-first` is the default). `--script batch` exercises
+sequential tools from one response; `--script tool-errors` returns invalid calls
+and read failures to the model. Requests/results are printed for inspection.
+Nothing is durable yet. `file-demo <path>` is a development-only async I/O fixture;
 unlike review, it writes the specified file.
 
 `Cargo.toml` uses `platform/host.rs` as the Rust binary and Tokio for async I/O.
