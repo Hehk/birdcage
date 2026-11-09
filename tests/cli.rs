@@ -10,7 +10,14 @@ fn birdcage(args: &[&str]) -> Output {
 #[test]
 fn review_arguments_reach_roc_intact() {
     let source = "feature/🦜 long enough to require a heap string".repeat(4);
-    let result = birdcage(&["review", &source, "--into", "main"]);
+    let result = birdcage(&[
+        "review",
+        &source,
+        "--into",
+        "main",
+        "--script",
+        "single-read",
+    ]);
     assert!(result.status.success(), "{result:?}");
     let output = String::from_utf8(result.stdout).unwrap();
     assert!(output.starts_with(&format!(
@@ -28,6 +35,51 @@ fn review_arguments_reach_roc_intact() {
     assert!(output[next_model..].contains("read-auth"));
     assert!(output[next_model..].contains("authorize = |_user| True"));
     assert!(result.stderr.is_empty());
+}
+
+#[test]
+fn model_scripts_choose_different_multi_round_investigations() {
+    for (script, tools) in [
+        (
+            "diff-first",
+            vec![
+                "diff git_diff",
+                "list-src list_files src",
+                "search-auth search authorize",
+                "read-auth read_file src/auth.roc",
+            ],
+        ),
+        (
+            "search-first",
+            vec![
+                "search-auth search authorize",
+                "read-auth read_file src/auth.roc",
+                "diff git_diff",
+            ],
+        ),
+        ("final", vec![]),
+    ] {
+        let result = birdcage(&["review", "feature", "--into", "main", "--script", script]);
+        assert!(result.status.success(), "{script}: {result:?}");
+        let output = String::from_utf8(result.stdout).unwrap();
+        let actual: Vec<_> = output
+            .lines()
+            .filter_map(|line| line.strip_prefix("Tool request: "))
+            .collect();
+        assert_eq!(actual, tools);
+        assert_eq!(output.matches("Model request:").count(), tools.len() + 1);
+        assert_eq!(output.matches("Tool result:").count(), tools.len());
+        assert_eq!(output.matches("Scripted review report").count(), 1);
+        assert!(result.stderr.is_empty());
+    }
+}
+
+#[test]
+fn unknown_scripts_do_not_start_a_review() {
+    let result = birdcage(&["review", "feature", "--into", "main", "--script", "unknown"]);
+    assert_eq!(result.status.code(), Some(2));
+    assert!(result.stdout.is_empty());
+    assert_eq!(result.stderr, b"Unknown script: unknown\n");
 }
 
 #[test]

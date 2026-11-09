@@ -14,11 +14,18 @@ main! = |args| match Cli.parse(args) {
 		Stderr.line!(error)
 		2
 	}
-	Ok(Review(review)) => {
+	Ok(Review(review, name)) => {
+		script = match Scripted.select(name) {
+			Ok(selected) => selected
+			Err(error) => {
+				Stderr.line!(error)
+				return 2
+			}
+		}
 		Stdout.line!("Scripted fixture mode; no repository inspection.")
 		Review.run!(
 			review,
-			Scripted.send!,
+			|request, done| Scripted.send!(script, request, done),
 			Scripted.run_tool!,
 			Box.box(
 				|result| {
