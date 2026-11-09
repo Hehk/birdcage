@@ -10,8 +10,16 @@ use std::ptr::{null_mut, NonNull};
 
 use abi::{DefaultAllocators, DefaultHandlers, RocStr};
 
-fn main() {
-    std::process::exit(files::run());
+fn main() -> std::process::ExitCode {
+    let args: Result<Vec<_>, _> = std::env::args_os()
+        .skip(1)
+        .map(|arg| arg.into_string())
+        .collect();
+    let Ok(args) = args else {
+        eprintln!("Arguments must be valid UTF-8");
+        return std::process::ExitCode::from(2);
+    };
+    std::process::ExitCode::from(files::run(&args) as u8)
 }
 
 #[unsafe(no_mangle)]
@@ -20,6 +28,15 @@ extern "C" fn roc_stdout_line(message: RocStr) {
     unsafe { message.decref(&abi::make_roc_host(null_mut())) };
     if let Err(error) = result {
         eprintln!("stdout: {error}");
+        std::process::exit(1);
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn roc_stderr_line(message: RocStr) {
+    let result = writeln!(io::stderr().lock(), "{}", message.as_str());
+    unsafe { message.decref(&abi::make_roc_host(null_mut())) };
+    if result.is_err() {
         std::process::exit(1);
     }
 }

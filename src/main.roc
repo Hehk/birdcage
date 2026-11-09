@@ -1,43 +1,22 @@
 app [main!] { pf: platform "../platform/main.roc" }
 
 import pf.Stdout
-import pf.File
+import pf.Stderr
+import Cli
+import FileDemo
 
-greeting = |language| "Hello from ${language}, hosted by Rust!"
-
-main! = || {
-	path = "build/async-roundtrip.txt"
-	contents = Str.repeat("Async Roc → Rust → Roc 🦜\n", 16)
-	File.write!(
-		path,
-		contents,
-		Box.box(
-			|written| {
-				match written {
-					Err(error) => crash error
-					Ok({}) => File.read!(
-						path,
-						Box.box(
-							|read| {
-								match read {
-									Err(error) => crash error
-									Ok(actual) => {
-										if actual != contents {
-											crash "File round-trip mismatch"
-										}
-										Stdout.line!(greeting("Roc"))
-									}
-								}
-							},
-						),
-					)
-				}
-			},
-		),
-	)
-	Stdout.line!("File I/O submitted")
-	0
+main! = |args| match Cli.parse(args) {
+	Err(error) => {
+		Stderr.line!(error)
+		2
+	}
+	Ok(Review(review)) => {
+		Stdout.line!("Scripted fixture mode; no repository inspection.")
+		Stdout.line!("Review request: ${review.source} into ${review.target}")
+		0
+	}
+	Ok(FileDemo(path)) => {
+		FileDemo.run!(path)
+		0
+	}
 }
-
-expect greeting("Roc") == "Hello from Roc, hosted by Rust!"
-expect greeting("🦜") == "Hello from 🦜, hosted by Rust!"

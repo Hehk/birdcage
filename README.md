@@ -5,14 +5,18 @@
 ```sh
 nix develop
 just build
-just run
+just run review feature --into main
 just test
 just fmt
 just lint
 ```
 
-`Cargo.toml` uses `platform/host.rs` as the Rust binary, with no third-party
-crates. `just build` prepares the Roc archive and bindings, then runs Cargo.
+`review` currently only parses the request in scripted fixture mode. It does not
+inspect a repository. `file-demo <path>` is a development-only async I/O fixture;
+unlike review, it writes the specified file.
+
+`Cargo.toml` uses `platform/host.rs` as the Rust binary and Tokio for async I/O.
+`just build` prepares the Roc archive and bindings, then runs Cargo.
 The default executable is `target/debug/birdcage`. Run, test, and clean commands
 respect Cargo's output directory, including `CARGO_TARGET_DIR`.
 

@@ -6,8 +6,9 @@ setup:
 build: setup
     @.tools/roc/roc scripts/build.roc
 
-run: build
-    @cargo run --quiet --bin birdcage
+[positional-arguments]
+run *args: build
+    @cargo run --quiet --bin birdcage -- "$@"
 
 test: build
     @.tools/roc/roc scripts/test.roc
