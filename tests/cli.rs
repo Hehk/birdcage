@@ -16,8 +16,17 @@ fn review_arguments_reach_roc_intact() {
     assert!(output.starts_with(&format!(
         "Scripted fixture mode; no repository inspection.\nModel request: {source} into main\n"
     )));
-    assert!(output.ends_with("Scripted review report (1 findings)\n[high] src/auth.roc:2 The fixture authorizes every caller.\nEvidence: authorize = |_user| True\n"));
-    assert_eq!(output.matches("Model request:").count(), 1);
+    assert!(output.ends_with("Scripted review report (1 findings)\n[high] src/auth.roc:1 The fixture authorizes every caller.\nEvidence: authorize = |_user| True\n"));
+    assert_eq!(output.matches("Model request:").count(), 2);
+    let tool_start = output
+        .find("Tool request: read-auth read_file src/auth.roc")
+        .unwrap();
+    let tool_end = output.find("Tool result:").unwrap();
+    let next_model = output.rfind("Model request:").unwrap();
+    assert!(tool_start < tool_end && tool_end < next_model);
+    assert!(output[next_model..].contains("ToolResult"));
+    assert!(output[next_model..].contains("read-auth"));
+    assert!(output[next_model..].contains("authorize = |_user| True"));
     assert!(result.stderr.is_empty());
 }
 

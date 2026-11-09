@@ -19,6 +19,7 @@ main! = |args| match Cli.parse(args) {
 		Review.run!(
 			review,
 			Scripted.send!,
+			Scripted.run_tool!,
 			Box.box(
 				|result| {
 					match result {
