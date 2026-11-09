@@ -4,6 +4,10 @@ import pf.Stdout
 import pf.Stderr
 import Cli
 import FileDemo
+import pf.Host
+import Review
+import Report
+import Scripted
 
 main! = |args| match Cli.parse(args) {
 	Err(error) => {
@@ -12,7 +16,21 @@ main! = |args| match Cli.parse(args) {
 	}
 	Ok(Review(review)) => {
 		Stdout.line!("Scripted fixture mode; no repository inspection.")
-		Stdout.line!("Review request: ${review.source} into ${review.target}")
+		Review.run!(
+			review,
+			Scripted.send!,
+			Box.box(
+				|result| {
+					match result {
+						Ok(findings) => Stdout.line!(Report.render(findings))
+						Err(error) => {
+							Stderr.line!("Review failed: ${error}")
+							Host.exit_code!(1)
+						}
+					}
+				},
+			),
+		)
 		0
 	}
 	Ok(FileDemo(path)) => {

@@ -11,8 +11,8 @@ just fmt
 just lint
 ```
 
-`review` currently only parses the request in scripted fixture mode. It does not
-inspect a repository. `file-demo <path>` is a development-only async I/O fixture;
+`review` currently returns a scripted fixture finding through a deferred model
+callback. It does not inspect a repository or contact a model provider. `file-demo <path>` is a development-only async I/O fixture;
 unlike review, it writes the specified file.
 
 `Cargo.toml` uses `platform/host.rs` as the Rust binary and Tokio for async I/O.

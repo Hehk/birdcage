@@ -3,6 +3,7 @@
 #[path = "../build/roc_platform_abi.rs"]
 mod abi;
 mod files;
+mod runtime;
 
 use std::ffi::c_void;
 use std::io::{self, Write};
@@ -19,7 +20,7 @@ fn main() -> std::process::ExitCode {
         eprintln!("Arguments must be valid UTF-8");
         return std::process::ExitCode::from(2);
     };
-    std::process::ExitCode::from(files::run(&args) as u8)
+    std::process::ExitCode::from(runtime::run(&args) as u8)
 }
 
 #[unsafe(no_mangle)]

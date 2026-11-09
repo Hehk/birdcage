@@ -12,12 +12,12 @@ fn review_arguments_reach_roc_intact() {
     let source = "feature/🦜 long enough to require a heap string".repeat(4);
     let result = birdcage(&["review", &source, "--into", "main"]);
     assert!(result.status.success(), "{result:?}");
-    assert_eq!(
-        String::from_utf8(result.stdout).unwrap(),
-        format!(
-        "Scripted fixture mode; no repository inspection.\nReview request: {source} into main\n"
-    )
-    );
+    let output = String::from_utf8(result.stdout).unwrap();
+    assert!(output.starts_with(&format!(
+        "Scripted fixture mode; no repository inspection.\nModel request: {source} into main\n"
+    )));
+    assert!(output.ends_with("Scripted review report (1 findings)\n[high] src/auth.roc:2 The fixture authorizes every caller.\nEvidence: authorize = |_user| True\n"));
+    assert_eq!(output.matches("Model request:").count(), 1);
     assert!(result.stderr.is_empty());
 }
 
