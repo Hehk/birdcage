@@ -2,6 +2,7 @@
 #[allow(clippy::all)]
 #[path = "../build/roc_platform_abi.rs"]
 mod abi;
+mod files;
 
 use std::ffi::c_void;
 use std::io::{self, Write};
@@ -10,7 +11,7 @@ use std::ptr::{null_mut, NonNull};
 use abi::{DefaultAllocators, DefaultHandlers, RocStr};
 
 fn main() {
-    std::process::exit(unsafe { abi::roc_main() });
+    std::process::exit(files::run());
 }
 
 #[unsafe(no_mangle)]

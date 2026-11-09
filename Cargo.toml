@@ -10,6 +10,9 @@ build = "platform/build.rs"
 name = "birdcage"
 path = "platform/host.rs"
 
+[dependencies]
+tokio = { version = "1", features = ["rt", "fs"] }
+
 [profile.dev]
 panic = "abort"
 

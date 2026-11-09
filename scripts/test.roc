@@ -6,7 +6,7 @@ main! = |_args| {
 	Cmd.call!(".tools/roc/roc", ["test", "src/main.roc"])?
 	Cmd.call!("cargo", ["test", "--quiet"])?
 	output = Cmd.new("cargo").args(["run", "--quiet", "--bin", "birdcage"]).capture!()?
-	if output != "Hello from Roc, hosted by Rust!\n" {
+	if output != "File I/O submitted\nHello from Roc, hosted by Rust!\n" {
 		return Err(UnexpectedOutput(output))
 	}
 	Ok({})
