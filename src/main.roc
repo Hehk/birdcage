@@ -42,7 +42,12 @@ main! = |args| match Cli.parse(args) {
 		0
 	}
 	Ok(FileDemo(path)) => {
-		FileDemo.run!(path)
-		0
+		match FileDemo.run!(path) {
+			Ok({}) => 0
+			Err(error) => {
+				Stderr.line!("File demo failed: ${error}")
+				1
+			}
+		}
 	}
 }

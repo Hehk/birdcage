@@ -233,15 +233,26 @@ fn invalid_utf8_is_rejected_without_lossy_conversion() {
 }
 
 #[test]
-fn asynchronous_file_fixture_preserves_heap_captures() {
+fn file_write_failure_is_returned_to_roc() {
+    let path = std::env::temp_dir()
+        .join(format!("birdcage-missing-parent-{}", std::process::id()))
+        .join("file");
+    let result = birdcage(&["file-demo", path.to_str().unwrap()]);
+    assert_eq!(result.status.code(), Some(1), "{result:?}");
+    assert!(result.stdout.is_empty());
+    assert!(String::from_utf8(result.stderr)
+        .unwrap()
+        .starts_with("File demo failed: "));
+    assert!(!path.exists());
+}
+
+#[test]
+fn direct_file_fixture_preserves_heap_values() {
     let path =
         std::env::temp_dir().join(format!("birdcage-file-fixture-{}.txt", std::process::id()));
     let result = birdcage(&["file-demo", path.to_str().unwrap()]);
     assert!(result.status.success(), "{result:?}");
-    assert_eq!(
-        result.stdout,
-        b"File I/O submitted\nFile round-trip verified\n"
-    );
+    assert_eq!(result.stdout, b"File round-trip verified\n");
     assert_eq!(
         std::fs::read_to_string(&path).unwrap(),
         "Async Roc → Rust → Roc 🦜\n".repeat(16)

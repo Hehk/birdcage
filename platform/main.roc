@@ -7,8 +7,6 @@ platform "birdcage"
 	provides {
 		"roc_deferred": deferred!,
 		"roc_main": main_for_host!,
-		"roc_read_completed": read_completed!,
-		"roc_write_completed": write_completed!,
 	}
 	hosted {
 		"roc_defer": Host.defer!,
@@ -35,9 +33,3 @@ main_for_host! = main!
 
 deferred! : Box(() => {}) => {}
 deferred! = |callback| callback.unbox()()
-
-read_completed! : Box(Try(Str, Str) => {}), Try(Str, Str) => {}
-read_completed! = |callback, result| callback.unbox()(result)
-
-write_completed! : Box(Try({}, Str) => {}), Try({}, Str) => {}
-write_completed! = |callback, result| callback.unbox()(result)
