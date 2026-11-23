@@ -37,7 +37,14 @@ handle_message! = |args| {
 				HttpError(status, detail) => "OpenAI HTTP ${Str.inspect(status)}: ${detail}"
 				InvalidUnicode => "OpenAI returned invalid UTF-8"
 				InvalidResponse => "OpenAI returned an invalid response"
-				IncompleteResponse(status) => "OpenAI response was not completed: ${status}"
+				ResponseNotCompleted(details) => {
+					summary = "OpenAI response was not completed: ${details.status}"
+					if details.reason.is_empty() {
+						summary
+					} else {
+						"${summary} (${details.reason})"
+					}
+				}
 				MissingContent => "OpenAI message has no content"
 				MissingText => "OpenAI text output has no text"
 				Refused => "OpenAI refused the request"

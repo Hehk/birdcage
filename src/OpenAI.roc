@@ -1,7 +1,7 @@
 import pf.Http
 
 OpenAI := [].{
-	Error : [TransportError(Str), HttpError(U16, Str), InvalidUnicode, InvalidResponse, IncompleteResponse(Str), MissingContent, MissingText, Refused, NoText]
+	Error : [TransportError(Str), HttpError(U16, Str), InvalidUnicode, InvalidResponse, ResponseNotCompleted({ status : Str, reason : Str }), MissingContent, MissingText, Refused, NoText]
 	Output : { type : Str, content ?: List({ type : Str, text ?: Str }) }
 	Response : { status : Str, output : List(Output) }
 
@@ -42,7 +42,13 @@ OpenAI := [].{
 		parsed = Json.parse(json)
 		response = parsed.map_err(|_| InvalidResponse)?
 		if response.status != "completed" {
-			return Err(IncompleteResponse(response.status))
+			details : Try({ incomplete_details : { reason : Str } }, _)
+			details = Json.parse(json)
+			reason = match details {
+				Ok(value) => value.incomplete_details.reason
+				Err(_) => ""
+			}
+			return Err(ResponseNotCompleted({ status: response.status, reason }))
 		}
 		var $parts = []
 		for output in response.output {
@@ -82,7 +88,7 @@ expect {
 				body == Ok({ model: "test-model", input: message, store: False, reasoning: { effort: "medium" } })
 }
 
-expect OpenAI.decode(200, "{\"id\":\"resp_test\",\"status\":\"completed\",\"output\":[{\"type\":\"reasoning\",\"summary\":[]},{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello \"},{\"type\":\"output_text\",\"text\":\"🦜\"}]}]}".to_utf8()) == Ok("Hello 🦜")
+expect OpenAI.decode(200, "{\"id\":\"resp_test\",\"status\":\"completed\",\"incomplete_details\":null,\"output\":[{\"type\":\"reasoning\",\"summary\":[]},{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello \"},{\"type\":\"output_text\",\"text\":\"🦜\"}]}]}".to_utf8()) == Ok("Hello 🦜")
 
 expect OpenAI.decode(401, "{\"error\":{\"message\":\"Invalid API key\",\"type\":\"invalid_request_error\"}}".to_utf8()) == Err(HttpError(401, "Invalid API key"))
 
@@ -92,7 +98,11 @@ expect OpenAI.decode(200, "not json".to_utf8()) == Err(InvalidResponse)
 
 expect OpenAI.decode(200, [255]) == Err(InvalidUnicode)
 
-expect OpenAI.decode(200, "{\"status\":\"incomplete\",\"output\":[]}".to_utf8()) == Err(IncompleteResponse("incomplete"))
+expect OpenAI.decode(200, "{\"status\":\"incomplete\",\"output\":[],\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}".to_utf8()) == Err(ResponseNotCompleted({ status: "incomplete", reason: "max_output_tokens" }))
+
+expect OpenAI.decode(200, "{\"status\":\"failed\",\"output\":[],\"incomplete_details\":null}".to_utf8()) == Err(ResponseNotCompleted({ status: "failed", reason: "" }))
+
+expect OpenAI.decode(200, "{\"status\":\"incomplete\",\"output\":[]}".to_utf8()) == Err(ResponseNotCompleted({ status: "incomplete", reason: "" }))
 
 expect OpenAI.decode(200, "{\"status\":\"completed\",\"output\":[]}".to_utf8()) == Err(NoText)
 
