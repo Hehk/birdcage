@@ -4,6 +4,7 @@
 mod abi;
 mod env;
 mod files;
+mod http;
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
