@@ -2,7 +2,7 @@ platform "birdcage"
 	requires {
 		main! : List(Str) => I32
 	}
-	exposes [File, Host, Stderr, Stdout]
+	exposes [Env, File, Host, Stderr, Stdout]
 	packages {}
 	provides {
 		"roc_deferred": deferred!,
@@ -10,6 +10,7 @@ platform "birdcage"
 	}
 	hosted {
 		"roc_defer": Host.defer!,
+		"roc_env_var": Env.var!,
 		"roc_exit_code": Host.exit_code!,
 		"roc_file_read": File.read!,
 		"roc_file_write": File.write!,
@@ -26,6 +27,7 @@ platform "birdcage"
 import Stdout
 import Stderr
 import File
+import Env
 import Host
 
 main_for_host! : List(Str) => I32

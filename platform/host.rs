@@ -2,6 +2,7 @@
 #[allow(clippy::all)]
 #[path = "../build/roc_platform_abi.rs"]
 mod abi;
+mod env;
 mod files;
 
 use std::cell::{Cell, RefCell};
