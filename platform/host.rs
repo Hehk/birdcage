@@ -33,7 +33,7 @@ fn main() -> std::process::ExitCode {
         .build()
         .unwrap();
     let status = tokio::task::LocalSet::new().block_on(&runtime, async {
-        let status = unsafe { abi::roc_main(arguments(&args)) };
+        let status = unsafe { abi::roc_main(roc_strings(&args)) };
         loop {
             let next = PENDING.with(|pending| pending.borrow_mut().pop());
             let Some(next) = next else { break };
@@ -44,7 +44,7 @@ fn main() -> std::process::ExitCode {
     std::process::ExitCode::from(status as u8)
 }
 
-fn arguments(args: &[String]) -> abi::RocList<RocStr> {
+fn roc_strings(args: &[String]) -> abi::RocList<RocStr> {
     let host = abi::make_roc_host(null_mut());
     let list = unsafe { abi::RocList::<RocStr>::allocate(args.len(), &host) };
     for (index, arg) in args.iter().enumerate() {
@@ -132,7 +132,7 @@ mod tests {
     fn argument_lists_own_their_strings() {
         let host = abi::make_roc_host(null_mut());
         for args in [vec![], vec![String::new(), "short".into(), "🦜".repeat(64)]] {
-            let list = arguments(&args);
+            let list = roc_strings(&args);
             let actual: Vec<_> = list.as_slice().iter().map(|arg| arg.as_str()).collect();
             assert_eq!(actual, args);
             unsafe { abi::decref_list_of_str(list, &host) };

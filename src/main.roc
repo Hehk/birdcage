@@ -4,13 +4,27 @@ import pf.Env
 import pf.Stderr
 import pf.Stdout
 import OpenAI
-import Uuid
+import Session
 
 handle_message! = |args| {
 	message = match args {
 		[msg] => msg
 		_ => {
 			Stderr.line!("Invalid message")
+			return 1
+		}
+	}
+
+	session_id = match Session.create!(message) {
+		Ok(id) => id
+		Err(error) => {
+			detail = match error {
+				RandomFailure(reason) => "Could not generate session ID: ${reason}"
+				StateDirectoryFailed(reason) => state_directory_message(reason)
+				CreateDirectoryFailed(io) => "Could not create sessions directory: ${io.detail}"
+				CreateSessionFailed(io) => "Could not create session file: ${io.detail}"
+			}
+			Stderr.line!(detail)
 			return 1
 		}
 	}
@@ -29,6 +43,18 @@ handle_message! = |args| {
 
 	match OpenAI.send!(open_ai_key, "gpt-6.2-sol", message) {
 		Ok(response) => {
+			match Session.append_reply!(session_id, response) {
+				Ok({}) => {}
+				Err(error) => {
+					detail = match error {
+						InvalidSessionId => "Invalid session ID"
+						StateDirectoryFailed(reason) => state_directory_message(reason)
+						AppendReplyFailed(io) => io.detail
+					}
+					Stderr.line!("Could not save reply for session ${session_id}: ${detail}")
+					return 1
+				}
+			}
 			Stdout.line!(response)
 			0
 		}
@@ -57,8 +83,14 @@ handle_message! = |args| {
 	}
 }
 
+state_directory_message : Session.DirectoryError -> Str
+state_directory_message = |error| match error {
+	NoStateDirectory => "No state directory: set XDG_STATE_HOME or HOME"
+	InvalidHomePath => "HOME is not an absolute path"
+}
+
 handle_help! = || {
-	Stdout.line!("TODO: implement help")
+	Stdout.line!("Usage: birdcage message <text>")
 	0
 }
 
