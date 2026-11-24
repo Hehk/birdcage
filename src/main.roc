@@ -4,6 +4,7 @@ import pf.Env
 import pf.Stderr
 import pf.Stdout
 import OpenAI
+import Uuid
 
 handle_message! = |args| {
 	message = match args {

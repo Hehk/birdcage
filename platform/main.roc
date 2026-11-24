@@ -2,7 +2,7 @@ platform "birdcage"
 	requires {
 		main! : List(Str) => I32
 	}
-	exposes [Env, File, Host, Http, Stderr, Stdout]
+	exposes [Env, File, Host, Http, Random, Stderr, Stdout]
 	packages {}
 	provides {
 		"roc_deferred": deferred!,
@@ -15,6 +15,7 @@ platform "birdcage"
 		"roc_file_read": File.read!,
 		"roc_file_write": File.write!,
 		"roc_http_send": Http.send!,
+		"roc_random_bytes": Random.bytes!,
 		"roc_stderr_line": Stderr.line!,
 		"roc_stdout_line": Stdout.line!,
 	}
@@ -31,6 +32,7 @@ import File
 import Env
 import Host
 import Http
+import Random
 
 main_for_host! : List(Str) => I32
 main_for_host! = main!

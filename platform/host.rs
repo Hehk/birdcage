@@ -5,6 +5,7 @@ mod abi;
 mod env;
 mod files;
 mod http;
+mod random;
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
