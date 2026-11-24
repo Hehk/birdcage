@@ -5,10 +5,12 @@ OpenAI := [].{
 	Output : { type : Str, content ?: List({ type : Str, text ?: Str }) }
 	Response : { status : Str, output : List(Output) }
 
-	request : Str, Str, Str -> Http.Request
-	request = |key, model, message| {
-		payload : { model : Str, input : Str, store : Bool, reasoning : { effort : Str } }
-		payload = { model, input: message, store: False, reasoning: { effort: "medium" } }
+	Message : { role : Str, content : Str }
+
+	request : Str, Str, List(Message) -> Http.Request
+	request = |key, model, messages| {
+		payload : { model : Str, input : List(Message), store : Bool, reasoning : { effort : Str } }
+		payload = { model, input: messages, store: False, reasoning: { effort: "medium" } }
 		{
 			method: "POST",
 			url: "https://api.openai.com/v1/responses",
@@ -21,9 +23,9 @@ OpenAI := [].{
 		}
 	}
 
-	send! : Str, Str, Str => Try(Str, Error)
-	send! = |key, model, message| {
-		http_response = Http.send!(request(key, model, message)).map_err(|error| TransportError(error))?
+	send! : Str, Str, List(Message) => Try(Str, Error)
+	send! = |key, model, messages| {
+		http_response = Http.send!(request(key, model, messages)).map_err(|error| TransportError(error))?
 		decode(http_response.status, http_response.body)
 	}
 
@@ -75,9 +77,9 @@ OpenAI := [].{
 }
 
 expect {
-	message = "Hello \"world\"\n🦜"
-	request = OpenAI.request("test-key", "test-model", message)
-	body : Try({ model : Str, input : Str, store : Bool, reasoning : { effort : Str } }, _)
+	messages = [{ role: "user", content: "Hello \"world\"\n🦜" }, { role: "assistant", content: "Hi" }]
+	request = OpenAI.request("test-key", "test-model", messages)
+	body : Try({ model : Str, input : List(OpenAI.Message), store : Bool, reasoning : { effort : Str } }, _)
 	body = Json.parse(Str.from_utf8(request.body) ?? "")
 	request.method == "POST" and
 		request.url == "https://api.openai.com/v1/responses" and
@@ -85,7 +87,7 @@ expect {
 				{ name: "Authorization", value: "Bearer test-key" },
 				{ name: "Content-Type", value: "application/json" },
 			] and
-				body == Ok({ model: "test-model", input: message, store: False, reasoning: { effort: "medium" } })
+				body == Ok({ model: "test-model", input: messages, store: False, reasoning: { effort: "medium" } })
 }
 
 expect OpenAI.decode(200, "{\"id\":\"resp_test\",\"status\":\"completed\",\"incomplete_details\":null,\"output\":[{\"type\":\"reasoning\",\"summary\":[]},{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Hello \"},{\"type\":\"output_text\",\"text\":\"🦜\"}]}]}".to_utf8()) == Ok("Hello 🦜")

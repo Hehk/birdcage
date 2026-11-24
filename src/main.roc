@@ -6,28 +6,62 @@ import pf.Stdout
 import OpenAI
 import Session
 
+parse_message_args : List(Str) -> Try({ message : Str, session : [New, Existing(Str)] }, [InvalidMessageArgs])
+parse_message_args = |args| match args {
+	["--session", id, message] => Ok({ message, session: Existing(id) })
+	[message, "--session", id] => Ok({ message, session: Existing(id) })
+	["--session"] => Err(InvalidMessageArgs)
+	[message] => Ok({ message, session: New })
+	_ => Err(InvalidMessageArgs)
+}
+
+expect parse_message_args(["--session", "id", "hello"]) == Ok({ message: "hello", session: Existing("id") })
+expect parse_message_args(["hello", "--session", "id"]) == Ok({ message: "hello", session: Existing("id") })
+expect parse_message_args(["hello", "--session"]) == Err(InvalidMessageArgs)
+
 handle_message! = |args| {
-	message = match args {
-		[msg] => msg
-		_ => {
+	parsed = match parse_message_args(args) {
+		Ok(value) => value
+		Err(InvalidMessageArgs) => {
 			Stderr.line!("Invalid message")
 			return 1
 		}
 	}
 
-	session_id = match Session.create!(message) {
-		Ok(id) => id
-		Err(error) => {
-			detail = match error {
-				RandomFailure(reason) => "Could not generate session ID: ${reason}"
-				StateDirectoryFailed(reason) => state_directory_message(reason)
-				CreateDirectoryFailed(io) => "Could not create sessions directory: ${io.detail}"
-				CreateSessionFailed(io) => "Could not create session file: ${io.detail}"
+	conversation = match parsed.session {
+		New => match Session.create!(parsed.message) {
+			Ok(id) => { id, messages: [{ role: "user", content: parsed.message }] }
+			Err(error) => {
+				detail = match error {
+					RandomFailure(reason) => "Could not generate session ID: ${reason}"
+					StateDirectoryFailed(reason) => state_directory_message(reason)
+					CreateDirectoryFailed(io) => "Could not create sessions directory: ${io.detail}"
+					CreateSessionFailed(io) => "Could not create session file: ${io.detail}"
+				}
+				Stderr.line!(detail)
+				return 1
 			}
-			Stderr.line!(detail)
-			return 1
+		}
+		Existing(id) => match Session.continue!(id, parsed.message) {
+			Ok(messages) => { id, messages }
+			Err(error) => {
+				detail = match error {
+					InvalidSessionId => "Invalid session ID"
+					StateDirectoryFailed(reason) => state_directory_message(reason)
+					ReadSessionFailed(io) => if io.kind == NotFound {
+						"Session not found: ${id}"
+					} else {
+						"Could not read session ${id}: ${io.detail}"
+					}
+					InvalidHistory(line) => "Invalid history for session ${id} at line ${Str.inspect(line)}"
+					AppendMessageFailed(io) => "Could not save message for session ${id}: ${io.detail}"
+				}
+				Stderr.line!(detail)
+				return 1
+			}
 		}
 	}
+	session_id = conversation.id
 
 	open_ai_key = match Env.var!("OPENAI_API_KEY") {
 		Ok(value) => value
@@ -41,7 +75,7 @@ handle_message! = |args| {
 		}
 	}
 
-	match OpenAI.send!(open_ai_key, "gpt-6.2-sol", message) {
+	match OpenAI.send!(open_ai_key, "gpt-6.2-sol", conversation.messages) {
 		Ok(response) => {
 			match Session.append_reply!(session_id, response) {
 				Ok({}) => {}
@@ -56,6 +90,7 @@ handle_message! = |args| {
 				}
 			}
 			Stdout.line!(response)
+			Stdout.line!("session_id: ${session_id}")
 			0
 		}
 		Err(error) => {
@@ -90,7 +125,7 @@ state_directory_message = |error| match error {
 }
 
 handle_help! = || {
-	Stdout.line!("Usage: birdcage message <text>")
+	Stdout.line!("Usage: birdcage message [--session <id>] <text>\n       birdcage message <text> --session <id>")
 	0
 }
 
