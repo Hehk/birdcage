@@ -5,17 +5,19 @@ import Uuid
 Session := [].{
 	DirectoryError : [NoStateDirectory, InvalidHomePath]
 	Message : { role : Str, content : Str }
+	Conversation : { id : Str, messages : List(Message) }
 
-	create! : Str => Try(Str, [RandomFailure(Str), StateDirectoryFailed(DirectoryError), CreateDirectoryFailed(File.Error), CreateSessionFailed(File.Error)])
+	create! : Str => Try(Conversation, [RandomFailure(Str), StateDirectoryFailed(DirectoryError), CreateDirectoryFailed(File.Error), CreateSessionFailed(File.Error)])
 	create! = |message| {
 		id = Uuid.v4!().map_err(|RandomFailure(detail)| RandomFailure(detail))?
 		directory = directory!().map_err(|error| StateDirectoryFailed(error))?
 		File.create_dir_all!(directory).map_err(|error| CreateDirectoryFailed(error))?
-		File.create_new!(session_path(directory, id), message_line(id, "user", message)).map_err(|error| CreateSessionFailed(error))?
-		Ok(id)
+		user_message = { role: "user", content: message }
+		File.create_new!(session_path(directory, id), message_line(id, user_message)).map_err(|error| CreateSessionFailed(error))?
+		Ok({ id, messages: [user_message] })
 	}
 
-	continue! : Str, Str => Try(List(Message), [InvalidSessionId, StateDirectoryFailed(DirectoryError), ReadSessionFailed(File.Error), InvalidHistory(U64), AppendMessageFailed(File.Error)])
+	continue! : Str, Str => Try(Conversation, [InvalidSessionId, StateDirectoryFailed(DirectoryError), ReadSessionFailed(File.Error), BadLine(U64), AppendMessageFailed(File.Error)])
 	continue! = |id, message| {
 		if !is_session_id(id) {
 			return Err(InvalidSessionId)
@@ -23,9 +25,10 @@ Session := [].{
 		directory = directory!().map_err(|error| StateDirectoryFailed(error))?
 		path = session_path(directory, id)
 		contents = File.read!(path).map_err(|error| ReadSessionFailed(error))?
-		history = decode_history(id, contents).map_err(|line| InvalidHistory(line))?
-		File.append!(path, message_line(id, "user", message)).map_err(|error| AppendMessageFailed(error))?
-		Ok(history.append({ role: "user", content: message }))
+		history = decode_history(id, contents)?
+		user_message = { role: "user", content: message }
+		File.append!(path, message_line(id, user_message)).map_err(|error| AppendMessageFailed(error))?
+		Ok({ id, messages: history.append(user_message) })
 	}
 
 	append_reply! : Str, Str => Try({}, [InvalidSessionId, StateDirectoryFailed(DirectoryError), AppendReplyFailed(File.Error)])
@@ -34,7 +37,7 @@ Session := [].{
 			return Err(InvalidSessionId)
 		}
 		directory = directory!().map_err(|error| StateDirectoryFailed(error))?
-		File.append!(session_path(directory, id), message_line(id, "assistant", reply)).map_err(|error| AppendReplyFailed(error))
+		File.append!(session_path(directory, id), message_line(id, { role: "assistant", content: reply })).map_err(|error| AppendReplyFailed(error))
 	}
 
 	list! : () => Try(List(Str), [StateDirectoryFailed(DirectoryError), ListSessionsFailed(File.Error)])
@@ -113,43 +116,48 @@ expect session_ids([
 session_path : Str, Str -> Str
 session_path = |directory, id| "${directory}/${id}.jsonl"
 
-message_line : Str, Str, Str -> Str
-message_line = |id, role, content| Json.to_str({ session_id: id, role, content }).concat("\n")
+message_line : Str, Session.Message -> Str
+message_line = |id, { role, content }| Json.to_str({ session_id: id, role, content }).concat("\n")
 
-decode_history : Str, Str -> Try(List(Session.Message), U64)
+decode_history : Str, Str -> Try(List(Session.Message), [BadLine(U64)])
 decode_history = |id, contents| {
-	lines = contents.split_on("\n")
+	(records, tail) = match contents.split_on("\n") {
+		[.. as complete, last] => (complete, last)
+		[] => return Err(BadLine(1))
+	}
 	var $messages = []
 	var $line_number = 1
-	for line in lines {
-		if $line_number == lines.len() {
-			if line.is_empty() and $line_number > 1 {
-				return Ok($messages)
-			}
-			return Err($line_number)
-		}
+	for line in records {
 		parsed : Try({ session_id : Str, role : Str, content : Str }, _)
 		parsed = Json.parse(line)
-		record = parsed.map_err(|_| $line_number)?
+		record = parsed.map_err(|_| BadLine($line_number))?
 		if record.session_id != id or (record.role != "user" and record.role != "assistant") {
-			return Err($line_number)
+			return Err(BadLine($line_number))
 		}
 		$messages = $messages.append({ role: record.role, content: record.content })
 		$line_number = $line_number + 1
 	}
-	Err($line_number)
+	if tail.is_empty() and !$messages.is_empty() {
+		Ok($messages)
+	} else {
+		Err(BadLine($line_number))
+	}
 }
 
+expect decode_history("id", "") == Err(BadLine(1))
+expect decode_history("id", "bad\npartial") == Err(BadLine(1))
+expect decode_history("id", "{\"session_id\":\"id\",\"role\":\"user\",\"content\":\"hi\"}") == Err(BadLine(1))
+
 expect {
-	contents = message_line("test-id", "user", "hello").concat(message_line("test-id", "assistant", "hi\nthere"))
+	contents = message_line("test-id", { role: "user", content: "hello" }).concat(message_line("test-id", { role: "assistant", content: "hi\nthere" }))
 	decode_history("test-id", contents) == Ok([{ role: "user", content: "hello" }, { role: "assistant", content: "hi\nthere" }]) and
-		decode_history("different-id", contents) == Err(1) and
-			decode_history("test-id", contents.concat("{\"partial")) == Err(3)
+		decode_history("different-id", contents) == Err(BadLine(1)) and
+			decode_history("test-id", contents.concat("{\"partial")) == Err(BadLine(3))
 }
 
 expect {
 	message = "first line\n\"second line\""
-	line = message_line("test-id", "user", message)
+	line = message_line("test-id", { role: "user", content: message })
 	parsed : Try({ session_id : Str, role : Str, content : Str }, _)
 	parsed = Json.parse(line)
 	parsed == Ok({ session_id: "test-id", role: "user", content: message }) and line.split_on("\n").len() == 2
